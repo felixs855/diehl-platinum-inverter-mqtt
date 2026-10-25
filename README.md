@@ -43,16 +43,6 @@ Notes:
 The RS-485 (EIA485) terminal of the inverter is Diehl's internal network bus and uses a
 different, undocumented protocol; it is not used here.
 
-## Repository layout
-
-```
-ct/diehl-platinum.sh                            Proxmox LXC installer (runs on the Proxmox host)
-install/diehl-platinum-install.sh               install script (runs inside the container)
-install/diehl-platinum/diehl_platinum_mqtt.py   the MQTT service
-tools/                                          test and analysis tools
-PROTOCOL.md                                     protocol documentation
-```
-
 ## Running the service directly
 
 ```bash
@@ -71,13 +61,8 @@ same wizard (default/advanced settings), same output, same `update` command insi
 container. It creates an **unprivileged** Debian container, passes the FTDI adapter through
 via `dev0` (group `dialout`) and installs the service.
 
-1. Fork or copy this repository to GitHub (it must be **public**, the installer fetches
-   files from `raw.githubusercontent.com`).
-2. In `ct/diehl-platinum.sh` replace `CHANGE_ME` in `_CS_DEFAULT_URL` with your GitHub user name.
-3. On the Proxmox host:
-
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/<user>/diehl-platinum-inverter-mqtt/main/ct/diehl-platinum.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/felixs855/diehl-platinum-inverter-mqtt/main/ct/diehl-platinum.sh)"
 ```
 
 The script detects the adapter under `/dev/serial/by-id/usb-FTDI*` and asks for the MQTT
