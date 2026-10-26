@@ -59,6 +59,11 @@ def day_frame(d: date) -> bytes:
     return body + crc16(body)
 
 
+def init_frame() -> bytes:
+    body = bytes([0xC5, ADDR, 0x03, 0x00, 0x00, 0xC3])
+    return body + crc16(body)  # -> C5 13 03 00 00 C3 6B 5A, answered with 3A 31 00 F8 5C
+
+
 def value_frame(vtype: int) -> bytes:
     body = bytes([0x35, ADDR, 0x01, vtype & 0xFF])
     return body + crc16(body)
@@ -87,6 +92,7 @@ class Inverter:
     def __init__(self, port: str):
         self.port_name = port
         self.port: Optional[serial.Serial] = None
+        self.initialized = False  # init packet acknowledged since the last silence
 
     def _open(self) -> serial.Serial:
         if self.port is None or not self.port.is_open:
@@ -120,7 +126,12 @@ class Inverter:
             finally:
                 time.sleep(0.05)
             if not resp:
-                raise NoResponse()
+                # After the inverter has been off (e.g. overnight) it seems to ignore data
+                # requests until it has seen the init packet again: send it once and retry.
+                if self.initialized or not self.send_init():
+                    self.initialized = False
+                    raise NoResponse()
+                continue
             if len(resp) < 5 or crc16(resp[:-2]) != resp[-2:]:
                 log.debug("invalid response: %s", resp.hex(" "))
                 return None
@@ -129,6 +140,25 @@ class Inverter:
             return resp if resp[0] == (frame[0] ^ 0xFF) else None
         log.debug("device stayed busy")
         return None
+
+    def send_init(self) -> bool:
+        """Sends the init packet (C5); True if the inverter acknowledges it (3A)."""
+        try:
+            port = self._open()
+            port.reset_input_buffer()
+            port.write(init_frame())
+            port.flush()
+            resp = read_frame(port)
+        except serial.SerialException:
+            self.close()
+            raise
+        finally:
+            time.sleep(0.05)
+        ok = len(resp) >= 5 and crc16(resp[:-2]) == resp[-2:] and resp[0] == 0x3A
+        if ok:
+            log.info("Inverter acknowledged the init packet")
+        self.initialized = ok
+        return ok
 
     def interval(self, d: date, index: int) -> Optional[dict]:
         r = self.request(intv_frame(d, index))
